@@ -7,9 +7,10 @@
  */
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -18,13 +19,14 @@ import {
   View,
 } from 'react-native';
 
-import { DaySeparator, MessageBubble, MessageInput } from '@/components/chat';
+import { DaySeparator, MessageBubble, MessageInput, ReplyBar } from '@/components/chat';
 import type { ChatItem } from '@/components/chat/chatItems';
 import { ErrorState, LoadingState, Screen } from '@/components/ui';
 import { useMessages } from '@/hooks/useMessages';
 import { useResolvedConversation } from '@/hooks/useResolvedConversation';
 import { getCurrentUserId } from '@/mocks';
 import type { RootStackParamList } from '@/navigation/types';
+import { joinConversation, leaveConversation, markConversationAsRead } from '@/services/socket';
 import { useMessagesStore } from '@/store/messagesStore';
 import { colors, spacing, typography } from '@/theme';
 import type { Message } from '@/types/models';
@@ -46,9 +48,21 @@ export function ChatScreen() {
   const currentUserId = getCurrentUserId();
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const { items, status, error, loadingOlder, onEndReached, retry } = useMessages(conversationId);
+  const { items, messages, status, error, loadingOlder, onEndReached, retry } =
+    useMessages(conversationId);
   const sendText = useMessagesStore((state) => state.sendText);
   const retryMessage = useMessagesStore((state) => state.retryMessage);
+  const deleteMessage = useMessagesStore((state) => state.deleteMessage);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+
+  /** Dernier message reçu : sert de repère de lecture côté serveur. */
+  const lastIncomingMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message && message.senderId !== currentUserId) return message.id;
+    }
+    return undefined;
+  }, [messages, currentUserId]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: conversation?.title ?? title ?? '' });
@@ -56,7 +70,26 @@ export function ChatScreen() {
 
   useEffect(() => {
     setSendError(null);
+    setReplyTo(null);
   }, [conversationId]);
+
+  /* Abonnement temps réel au fil ouvert (ICH-022). */
+  useEffect(() => {
+    if (!conversationId) return;
+    joinConversation(conversationId);
+    return () => leaveConversation(conversationId);
+  }, [conversationId]);
+
+  /*
+   * ICH-026 : la conversation est marquée comme lue à l'ouverture, et de
+   * nouveau quand un message arrive alors qu'elle est à l'écran — sinon le
+   * badge se remet à compter sous les yeux de quelqu'un qui est en train de
+   * lire.
+   */
+  useEffect(() => {
+    if (!conversationId || !lastIncomingMessageId) return;
+    void markConversationAsRead(conversationId, lastIncomingMessageId);
+  }, [conversationId, lastIncomingMessageId]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -64,9 +97,38 @@ export function ChatScreen() {
         setSendError("La conversation n'est pas encore prête, réessayez dans un instant.");
         return;
       }
-      void sendText(conversationId, text);
+      void sendText(conversationId, text, replyTo?.id ?? null);
+      setReplyTo(null);
     },
-    [conversationId, sendText]
+    [conversationId, replyTo, sendText]
+  );
+
+  /** ICH-027 / ICH-028 : répondre ou supprimer, via appui long. */
+  const handleLongPress = useCallback(
+    (message: Message) => {
+      const isOwn = message.senderId === currentUserId;
+      Alert.alert(
+        'Message',
+        undefined,
+        [
+          { text: 'Répondre', onPress: () => setReplyTo(message) },
+          ...(isOwn
+            ? [
+                {
+                  text: 'Supprimer',
+                  style: 'destructive' as const,
+                  onPress: () => {
+                    if (conversationId) void deleteMessage(conversationId, message.id);
+                  },
+                },
+              ]
+            : []),
+          { text: 'Annuler', style: 'cancel' as const },
+        ],
+        { cancelable: true }
+      );
+    },
+    [conversationId, currentUserId, deleteMessage]
   );
 
   const handleRetry = useCallback(
@@ -85,11 +147,12 @@ export function ChatScreen() {
           message={item.message}
           isOwn={item.message.senderId === currentUserId}
           showSender={item.showSender && conversation?.type === 'group'}
+          onLongPress={handleLongPress}
           onRetry={handleRetry}
         />
       );
     },
-    [conversation?.type, currentUserId, handleRetry]
+    [conversation?.type, currentUserId, handleLongPress, handleRetry]
   );
 
   const keyExtractor = useCallback((item: ChatItem) => item.key, []);
@@ -143,6 +206,8 @@ export function ChatScreen() {
         />
 
         {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
+
+        {replyTo ? <ReplyBar message={replyTo} onCancel={() => setReplyTo(null)} /> : null}
 
         <MessageInput onSend={handleSend} />
       </KeyboardAvoidingView>
