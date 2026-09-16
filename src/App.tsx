@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@/navigation';
 import { startNetworkMonitor } from '@/services/api';
 import { outbox } from '@/services/outbox';
-import { socketClient } from '@/services/socket';
+import { socketClient, startSocketSync } from '@/services/socket';
 import { connectOutboxToStore } from '@/store/messagesStore';
 
 export default function App() {
@@ -17,9 +17,12 @@ export default function App() {
     // précédente : un message écrit sans réseau n'est pas perdu.
     const disconnectOutbox = connectOutboxToStore();
     void outbox.start();
+    // Le socket ne parle qu'aux stores, jamais aux écrans.
+    const stopSocketSync = startSocketSync();
     socketClient.connect();
 
     return () => {
+      stopSocketSync();
       socketClient.disconnect();
       outbox.stop();
       disconnectOutbox();

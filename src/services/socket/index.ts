@@ -6,3 +6,10 @@ export type {
   ServerEvents,
   SocketStatus,
 } from './events';
+export {
+  startSocketSync,
+  resyncAfterReconnect,
+  joinConversation,
+  leaveConversation,
+  markConversationAsRead,
+} from './socketSync';
