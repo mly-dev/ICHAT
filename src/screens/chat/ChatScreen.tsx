@@ -20,8 +20,10 @@ import {
 } from 'react-native';
 
 import { DaySeparator, MessageBubble, MessageInput, ReplyBar } from '@/components/chat';
+import { UploadProgress, useUpload } from '@/components/upload';
 import type { ChatItem } from '@/components/chat/chatItems';
 import { ErrorState, LoadingState, Screen } from '@/components/ui';
+import { useAttachmentActions } from '@/hooks/useAttachmentActions';
 import { useMessages } from '@/hooks/useMessages';
 import { useResolvedConversation } from '@/hooks/useResolvedConversation';
 import { getCurrentUserId } from '@/mocks';
@@ -29,7 +31,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { joinConversation, leaveConversation, markConversationAsRead } from '@/services/socket';
 import { useMessagesStore } from '@/store/messagesStore';
 import { colors, spacing, typography } from '@/theme';
-import type { Message } from '@/types/models';
+import type { Message, MessageAttachment } from '@/types/models';
 
 type ChatRoute = RouteProp<RootStackParamList, 'Chat'>;
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -53,7 +55,44 @@ export function ChatScreen() {
   const sendText = useMessagesStore((state) => state.sendText);
   const retryMessage = useMessagesStore((state) => state.retryMessage);
   const deleteMessage = useMessagesStore((state) => state.deleteMessage);
+  const sendAttachment = useMessagesStore((state) => state.sendAttachment);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+
+  /*
+   * ICH-029 / ICH-032 : la pièce jointe est téléversée d'abord, puis envoyée
+   * comme message. Le composant d'upload est celui partagé avec Adam, on ne
+   * lui ajoute rien de spécifique à la messagerie.
+   */
+  const { uploading, progress, error: uploadError, pickAndUploadImage, pickAndUploadDocument, cancel } =
+    useUpload({
+      onUploaded: (attachment: MessageAttachment) => {
+        if (!conversationId) return;
+        void sendAttachment(conversationId, attachment, { replyToId: replyTo?.id ?? null });
+        setReplyTo(null);
+      },
+    });
+
+  const openImage = useCallback(
+    (attachment: MessageAttachment) => {
+      navigation.navigate('ImageViewer', { url: attachment.url, name: attachment.name });
+    },
+    [navigation]
+  );
+  const { onPressImage, onPressFile } = useAttachmentActions(openImage);
+
+  const handleAttach = useCallback(() => {
+    Alert.alert(
+      'Joindre',
+      undefined,
+      [
+        { text: 'Prendre une photo', onPress: () => void pickAndUploadImage('camera') },
+        { text: 'Choisir une image', onPress: () => void pickAndUploadImage('library') },
+        { text: 'Choisir un fichier', onPress: () => void pickAndUploadDocument() },
+        { text: 'Annuler', style: 'cancel' as const },
+      ],
+      { cancelable: true }
+    );
+  }, [pickAndUploadDocument, pickAndUploadImage]);
 
   /** Dernier message reçu : sert de repère de lecture côté serveur. */
   const lastIncomingMessageId = useMemo(() => {
@@ -149,10 +188,12 @@ export function ChatScreen() {
           showSender={item.showSender && conversation?.type === 'group'}
           onLongPress={handleLongPress}
           onRetry={handleRetry}
+          onPressImage={onPressImage}
+          onPressFile={onPressFile}
         />
       );
     },
-    [conversation?.type, currentUserId, handleLongPress, handleRetry]
+    [conversation?.type, currentUserId, handleLongPress, handleRetry, onPressFile, onPressImage]
   );
 
   const keyExtractor = useCallback((item: ChatItem) => item.key, []);
@@ -206,10 +247,13 @@ export function ChatScreen() {
         />
 
         {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
+        {uploadError ? <Text style={styles.error}>{uploadError}</Text> : null}
+
+        <UploadProgress progress={progress} onCancel={cancel} label="Envoi de la pièce jointe…" />
 
         {replyTo ? <ReplyBar message={replyTo} onCancel={() => setReplyTo(null)} /> : null}
 
-        <MessageInput onSend={handleSend} />
+        <MessageInput onSend={handleSend} onAttach={handleAttach} disabled={uploading} />
       </KeyboardAvoidingView>
     </Screen>
   );

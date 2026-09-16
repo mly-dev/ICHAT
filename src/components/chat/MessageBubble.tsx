@@ -2,9 +2,10 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
-import type { Message } from '@/types/models';
+import type { Message, MessageAttachment } from '@/types/models';
 import { formatTime } from '@/utils/time';
 
+import { AttachmentView } from './AttachmentView';
 import { MessageStatusIcon } from './MessageStatusIcon';
 
 export interface MessageBubbleProps {
@@ -14,9 +15,19 @@ export interface MessageBubbleProps {
   showSender: boolean;
   onLongPress?: (message: Message) => void;
   onRetry?: (message: Message) => void;
+  onPressImage?: (attachment: MessageAttachment) => void;
+  onPressFile?: (attachment: MessageAttachment) => void;
 }
 
-function MessageBubbleComponent({ message, isOwn, showSender, onLongPress, onRetry }: MessageBubbleProps) {
+function MessageBubbleComponent({
+  message,
+  isOwn,
+  showSender,
+  onLongPress,
+  onRetry,
+  onPressImage,
+  onPressFile,
+}: MessageBubbleProps) {
   const deleted = !!message.deletedAt;
 
   return (
@@ -43,6 +54,18 @@ function MessageBubbleComponent({ message, isOwn, showSender, onLongPress, onRet
             </Text>
           </View>
         ) : null}
+
+        {!deleted && message.attachments?.length
+          ? message.attachments.map((attachment) => (
+              <AttachmentView
+                key={attachment.id}
+                attachment={attachment}
+                isOwn={isOwn}
+                onPressImage={onPressImage}
+                onPressFile={onPressFile}
+              />
+            ))
+          : null}
 
         {deleted ? (
           <Text style={[styles.deleted, isOwn ? styles.textOwn : styles.textOther]}>
@@ -79,7 +102,9 @@ export const MessageBubble = memo(MessageBubbleComponent, (prev, next) => {
     a.deletedAt === b.deletedAt &&
     a.attachments === b.attachments &&
     prev.isOwn === next.isOwn &&
-    prev.showSender === next.showSender
+    prev.showSender === next.showSender &&
+    prev.onPressImage === next.onPressImage &&
+    prev.onPressFile === next.onPressFile
   );
 });
 
