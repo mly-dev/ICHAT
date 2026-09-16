@@ -28,11 +28,6 @@ export function sortMessages(messages: Message[]): Message[] {
   return [...messages].sort(compare);
 }
 
-/**
- * Le message serveur gagne, sauf pour le statut : un `pending` local qui vient
- * d'être confirmé passe à `sent`, mais on ne redescend jamais un `read` vers un
- * `sent` à cause d'un événement arrivé en retard.
- */
 const STATUS_RANK: Record<Message['status'], number> = {
   failed: 0,
   pending: 1,
@@ -41,9 +36,26 @@ const STATUS_RANK: Record<Message['status'], number> = {
   read: 4,
 };
 
+/**
+ * Le message serveur gagne, sauf pour le statut :
+ * - un `pending` confirmé passe à `sent`, mais un `read` ne redescend jamais
+ *   vers `sent` à cause d'un événement arrivé en retard ;
+ * - `failed` est un état purement local, produit par la file d'envoi : il doit
+ *   pouvoir marquer un `pending`, sans jamais effacer un statut déjà confirmé
+ *   par le serveur ;
+ * - à l'inverse, un message marqué `failed` qui finit par être confirmé
+ *   (réessai réussi) repasse au statut serveur.
+ */
+export function resolveStatus(existing: Message['status'], incoming: Message['status']): Message['status'] {
+  if (incoming === 'failed') {
+    return existing === 'pending' || existing === 'failed' ? 'failed' : existing;
+  }
+  if (existing === 'failed') return incoming;
+  return STATUS_RANK[existing] > STATUS_RANK[incoming] ? existing : incoming;
+}
+
 export function mergeOne(existing: Message, incoming: Message): Message {
-  const keepStatus =
-    STATUS_RANK[existing.status] > STATUS_RANK[incoming.status] ? existing.status : incoming.status;
+  const keepStatus = resolveStatus(existing.status, incoming.status);
 
   return {
     ...existing,

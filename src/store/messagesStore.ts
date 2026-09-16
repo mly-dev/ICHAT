@@ -218,7 +218,9 @@ export const useMessagesStore = create<MessagesState>((set, get) => {
         // qu'un message qu'on croit supprimé alors qu'il est encore chez l'autre.
         const current = threadOf(get(), conversationId);
         patchThread(conversationId, {
-          items: upsertMessage(current.items, target),
+          // `deletedAt: null` explicite : sans lui la fusion garde la marque de
+          // suppression, puisque le message d'origine n'a pas ce champ.
+          items: upsertMessage(current.items, { ...target, deletedAt: null }),
           error: toUserMessage(error),
         });
       }
