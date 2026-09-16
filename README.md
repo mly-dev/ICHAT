@@ -39,6 +39,7 @@ src/
   mocks/           ce qui appartient à Adam et n'existe pas encore
   utils/ theme/ types/
 docs/API-CONTRACT.md  contrat d'API supposé, à valider avec Ibou
+docs/ANOMALIES.md     anomalies relevées sur mes modules (ICH-117)
 RELEASE.md            procédure de build et de publication
 ```
 
