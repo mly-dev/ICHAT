@@ -14,6 +14,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -104,8 +105,24 @@ export function ChatScreen() {
   }, [messages, currentUserId]);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: conversation?.title ?? title ?? '' });
-  }, [conversation?.title, navigation, title]);
+    const isGroup = conversation?.type === 'group';
+    navigation.setOptions({
+      title: conversation?.title ?? title ?? '',
+      // Accès aux infos du groupe depuis l'en-tête (ICH-046).
+      headerRight: isGroup && conversationId
+        ? () => (
+            <Pressable
+              onPress={() => navigation.navigate('GroupInfo', { conversationId })}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Informations du groupe"
+            >
+              <Text style={styles.headerAction}>Infos</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [conversation?.title, conversation?.type, conversationId, navigation, title]);
 
   useEffect(() => {
     setSendError(null);
@@ -265,6 +282,7 @@ const styles = StyleSheet.create({
   emptyList: { flexGrow: 1, justifyContent: 'center', transform: [{ scaleY: -1 }] },
   empty: { alignItems: 'center', padding: spacing.xl },
   loader: { paddingVertical: spacing.lg },
+  headerAction: { ...typography.body, color: colors.primary, fontWeight: '600' },
   error: {
     ...typography.caption,
     color: colors.danger,
