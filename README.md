@@ -3,44 +3,58 @@
 Application de communication interne de l'Université ADU (Niamey, Niger).
 Accès réservé aux membres disposant d'une adresse e-mail officielle ADU.
 
-Ce dépôt contient l'application mobile React Native (Expo).
+Ce dépôt contient l'application mobile **React Native (CLI, template blanc)**,
+en JavaScript. Pas d'Expo, pas de TypeScript.
 
 ## Démarrage
 
 ```bash
 npm install
-cp .env.example .env     # ajuster EXPO_PUBLIC_API_URL quand le back est prêt
-npm start
+cd ios && pod install && cd ..   # macOS uniquement
+npm start                        # serveur Metro
+npm run android                  # ou npm run ios, dans un autre terminal
 ```
 
-Par défaut `EXPO_PUBLIC_USE_MOCKS=1` : l'app tourne sans back-end, servie par
-`src/services/api/mock.ts`. Passer à `0` dès que l'API d'Ibou est déployée.
+Par défaut `apiConfig.useMocks` vaut `true` dans `src/services/api/config.js` :
+l'app tourne sans back-end, servie par `src/services/api/mock.js`. Passer à
+`false` et renseigner `baseUrl` / `socketUrl` dès que l'API d'Ibou est déployée.
 
 ## Scripts
 
 | Commande | Rôle |
 |---|---|
-| `npm start` | Serveur de développement Expo |
-| `npm run android` / `npm run ios` | Lance sur un appareil / émulateur |
+| `npm start` | Serveur Metro |
+| `npm run android` / `npm run ios` | Compile et lance sur appareil ou émulateur |
 | `npm test` | Tests Jest |
-| `npm run typecheck` | Vérification TypeScript |
+| `npm run lint` | ESLint |
+
+## Dépendances
+
+Le socle est volontairement minimal : le template React Native + **react-navigation**,
+et rien d'autre. L'état global, le temps réel et la détection réseau sont écrits à
+la main plutôt qu'importés. Ce qui demanderait un module natif (stockage
+persistant, galerie, caméra, fichiers, push) passe par un adaptateur dans
+`src/services/native/` — voir `docs/DEPENDANCES-A-VALIDER.md`.
 
 ## Organisation
 
 ```
+android/ ios/     projets natifs, versionnés (projet bare)
 src/
   navigation/      pile + onglets, deep links, openConversation()
-  services/api/    client HTTP, erreurs typées, endpoints, back simulé
-  services/socket/ wrapper socket.io (reconnexion, file d'émission)
+  services/api/    client HTTP, erreurs, endpoints, back simulé
+  services/socket/ wrapper WebSocket (reconnexion, file d'émission)
+  services/native/ adaptateurs : stockage, média, push
   services/notifications/ push : token, réception, préférences
-  store/           Zustand : conversations, messages, groupes, notifications
-  components/      design system, upload partagé, briques de chat
+  store/           createStore maison + conversations, messages, groupes
+  components/      briques d'interface, upload partagé, briques de chat
   screens/         écrans de mon périmètre + placeholders pour ceux d'Adam
   mocks/           ce qui appartient à Adam et n'existe pas encore
   utils/ theme/ types/
-docs/API-CONTRACT.md  contrat d'API supposé, à valider avec Ibou
-docs/ANOMALIES.md     anomalies relevées sur mes modules (ICH-117)
-RELEASE.md            procédure de build et de publication
+docs/API-CONTRACT.md           contrat d'API supposé, à valider avec Ibou
+docs/DEPENDANCES-A-VALIDER.md  ce qui attend une dépendance
+docs/ANOMALIES.md              anomalies relevées sur mes modules (ICH-117)
+RELEASE.md                     procédure de build et de publication
 ```
 
 ## Répartition du travail

@@ -5,15 +5,22 @@ membres disposant d'une adresse e-mail officielle ADU. Pas d'inscription manuell
 compte est créé côté back à la première connexion validée.
 
 ## Stack
-- React Native avec **Expo (managed workflow)** + TypeScript
-- Navigation : **@react-navigation/native** (native-stack + bottom-tabs)
-- État global : **Zustand** (un store par domaine, persistance légère via AsyncStorage)
-- Temps réel : **socket.io-client**, encapsulé dans `src/services/socket/`
-- API back : base URL via `EXPO_PUBLIC_API_URL` (voir `.env.example`), back-end développé par Ibou
+- **React Native CLI**, template blanc (RN 0.87), dossiers `android/` et `ios/` versionnés.
+  Pas d'Expo.
+- **JavaScript / JSX**, pas de TypeScript. Les formes de données sont documentées en
+  JSDoc dans `src/types/models.js`.
+- Navigation : **@react-navigation/native** (native-stack + bottom-tabs) — la seule
+  dépendance ajoutée au template.
+- État global : **store maison** (`src/store/createStore.js`, ~40 lignes sur
+  `useSyncExternalStore`). API proche de Zustand, zéro dépendance.
+- Temps réel : **WebSocket natif**, encapsulé dans `src/services/socket/`.
+- API back : configuration dans `src/services/api/config.js`, back-end développé par Ibou.
 - Maquettes : Figma « E-CHAT »
 
-> Les choix Expo / react-navigation / Zustand / socket.io ont été posés au Sprint 0.
-> Toute modification de ce socle se discute avant d'être faite.
+> Règle du socle : **rien d'autre que react-navigation** n'est installé.
+> Tout ce qui demanderait une dépendance native (stockage persistant, galerie,
+> caméra, fichiers, push) passe par un adaptateur dans `src/services/native/` et
+> attend une validation — voir `docs/DEPENDANCES-A-VALIDER.md`.
 
 ## Qui fait quoi
 Je suis Momo, développeur front. Adam est l'autre dev front. Ibou fait le back.
@@ -40,15 +47,15 @@ Si une tâche te fait toucher au code d'Adam, arrête-toi et dis-le moi au lieu 
 ## Interfaces avec Adam
 - Le store d'auth (token, refresh) est à Adam. Je le consomme via son hook, je ne le
   réécris pas. S'il n'existe pas encore, crée un mock isolé dans `src/mocks/`.
-  → aujourd'hui : `src/mocks/authStore.ts`, exposé par `useAuth()`.
+  → aujourd'hui : `src/mocks/authStore.js`, exposé par `useAuth()`.
 - Mes écrans sont ouverts depuis les siens via `openConversation(userId)` — cette
-  signature est figée, ne la change pas. → `src/navigation/openConversation.ts`.
+  signature est figée, ne la change pas. → `src/navigation/openConversation.js`.
 - Le composant d'upload d'images que j'écris est partagé avec lui : garde-le générique,
   sans logique propre à la messagerie. → `src/components/upload/`.
-- L'annuaire ADU (ICH-040) est à Adam ; je le consomme via `src/mocks/directory.ts`
+- L'annuaire ADU (ICH-040) est à Adam ; je le consomme via `src/mocks/directory.js`
   tant que son écran n'existe pas.
 - Les préférences de notification sont exposées en service
-  (`src/services/notifications/preferences.ts`) pour que son écran Paramètres (ICH-075)
+  (`src/services/notifications/preferences.js`) pour que son écran Paramètres (ICH-075)
   les appelle sans que j'écrive son écran.
 
 ## Contraintes de contexte
@@ -73,8 +80,11 @@ Si une tâche te fait toucher au code d'Adam, arrête-toi et dis-le moi au lieu 
 
 ## Repères de code
 - `src/services/api/` — client HTTP, erreurs typées, endpoints par domaine
-- `src/services/socket/` — connexion, backoff, file d'émission, abonnements typés
-- `src/store/` — Zustand : conversations, messages, groupes, notifications
+- `src/services/socket/` — connexion, backoff, file d'émission, abonnements
+- `src/services/native/` — adaptateurs vers ce qui demanderait une dépendance native
+- `src/store/` — stores : conversations, messages, groupes
 - `src/components/ui/` — design system (états vide/erreur/chargement, bandeau hors-ligne…)
 - `src/mocks/` — tout ce qui appartient à Adam ou à Ibou et n'existe pas encore
 - `docs/API-CONTRACT.md` — contrat supposé, à valider avec Ibou
+- `docs/DEPENDANCES-A-VALIDER.md` — ce qui reste bloqué faute d'une dépendance
+- `docs/ANOMALIES.md` — anomalies relevées sur mes modules
