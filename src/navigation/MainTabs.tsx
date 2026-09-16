@@ -3,6 +3,7 @@ import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { ConversationsScreen } from '@/screens/conversations/ConversationsScreen';
+import { selectTotalUnread, useConversationsStore } from '@/store/conversationsStore';
 import { DirectoryScreen, MarketScreen, ProfileScreen } from '@/screens/placeholders';
 import { colors } from '@/theme';
 
@@ -18,6 +19,9 @@ function tabIcon(label: string) {
 }
 
 export function MainTabs() {
+  // Badge de l'onglet : lu depuis l'unique source de vérité des non-lus.
+  const totalUnread = useConversationsStore(selectTotalUnread);
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -29,7 +33,11 @@ export function MainTabs() {
       <Tab.Screen
         name="ConversationsTab"
         component={ConversationsScreen}
-        options={{ title: 'Discussions', tabBarIcon: tabIcon('💬') }}
+        options={{
+          title: 'Discussions',
+          tabBarIcon: tabIcon('💬'),
+          tabBarBadge: totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined,
+        }}
       />
       <Tab.Screen
         name="DirectoryTab"
