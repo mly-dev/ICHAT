@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootNavigator } from '@/navigation';
 import { startNetworkMonitor } from '@/services/api';
+import { startNotifications } from '@/services/notifications';
 import { outbox } from '@/services/outbox';
 import { socketClient, startSocketSync } from '@/services/socket';
 import { connectOutboxToStore } from '@/store/messagesStore';
@@ -20,8 +21,11 @@ export default function App() {
     // Le socket ne parle qu'aux stores, jamais aux écrans.
     const stopSocketSync = startSocketSync();
     socketClient.connect();
+    // Push : enregistrement du token, réception, badge et deep-link.
+    const stopNotifications = startNotifications();
 
     return () => {
+      stopNotifications();
       stopSocketSync();
       socketClient.disconnect();
       outbox.stop();
